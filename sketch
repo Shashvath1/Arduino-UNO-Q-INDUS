@@ -1,0 +1,445 @@
+// SPDX-FileCopyrightText: Copyright (C) Arduino s.r.l. and/or its affiliated companies
+//
+// SPDX-License-Identifier: MPL-2.0
+
+#include <Arduino_RouterBridge.h>
+#include <Arduino_LED_Matrix.h>
+
+// ========== LED MATRIX ==========
+Arduino_LED_Matrix matrix;
+uint8_t frame[104];   // 8 × 13 = 104 pixels
+
+// ========== LED CONTROL ==========
+const int LED_PIN = LED_BUILTIN;
+int person_count = 0;
+unsigned long detection_time = 0;
+const unsigned long DETECTION_DISPLAY_DURATION = 3000;
+
+// ---------------- FRAME UTILITIES ----------------
+void clearFrame() {
+    for (int i = 0; i < 104; i++)
+        frame[i] = 0;
+}
+
+void setPixel(int x, int y, uint8_t val) {
+    if (x < 0 || x >= 13 || y < 0 || y >= 8) return;
+    frame[y * 13 + x] = val;
+}
+
+void hLine(int x1, int x2, int y) {
+    for (int x = x1; x <= x2; x++)
+        setPixel(x, y, 7);
+}
+
+void vLine(int x, int y1, int y2) {
+    for (int y = y1; y <= y2; y++)
+        setPixel(x, y, 7);
+}
+
+void render() {
+    matrix.draw(frame);
+}
+
+// ---------------- DIGIT DRAW FUNCTIONS ----------------
+
+void draw1() {
+    vLine(6, 1, 6);
+}
+
+void draw2() {
+    hLine(4, 8, 0);
+    vLine(8, 0, 3);
+    hLine(4, 8, 3);
+    vLine(4, 3, 7);
+    hLine(4, 8, 7);
+}
+
+void draw3() {
+    hLine(4, 8, 0);
+    vLine(8, 0, 7);
+    hLine(4, 8, 3);
+    hLine(4, 8, 7);
+}
+
+void draw4() {
+    vLine(4, 0, 3);
+    vLine(8, 0, 7);
+    hLine(4, 8, 3);
+}
+
+void draw5() {
+    hLine(4, 8, 0);
+    vLine(4, 0, 3);
+    hLine(4, 8, 3);
+    vLine(8, 3, 7);
+    hLine(4, 8, 7);
+}
+
+void draw6() {
+    hLine(4, 8, 0);
+    vLine(4, 0, 7);
+    hLine(4, 8, 3);
+    vLine(8, 3, 7);
+    hLine(4, 8, 7);
+}
+
+void draw7() {
+    hLine(4, 8, 0);
+    vLine(8, 0, 7);
+}
+
+void draw8() {
+    hLine(4, 8, 0);
+    vLine(4, 0, 7);
+    vLine(8, 0, 7);
+    hLine(4, 8, 3);
+    hLine(4, 8, 7);
+}
+
+void draw9() {
+    hLine(4, 8, 0);
+    vLine(4, 0, 3);
+    vLine(8, 0, 7);
+    hLine(4, 8, 3);
+    hLine(4, 8, 7);
+}
+
+void draw0() {
+    hLine(4, 8, 0);
+    vLine(4, 0, 7);
+    vLine(8, 0, 7);
+    hLine(4, 8, 7);
+}
+
+// ---------------- DRAW PERSON ICON ----------------
+void drawPerson() {
+    clearFrame();
+    // Head
+    setPixel(6, 1, 7);
+    setPixel(5, 2, 7);
+    setPixel(7, 2, 7);
+    setPixel(6, 2, 7);
+    // Body
+    vLine(6, 3, 6);
+    // Arms
+    setPixel(4, 4, 7);
+    setPixel(8, 4, 7);
+    // Legs
+    setPixel(5, 7, 7);
+    setPixel(7, 7, 7);
+    render();
+}
+
+// ---------------- DRAW NUMBER ----------------
+void drawNumber(int num) {
+    clearFrame();
+    switch(num) {
+        case 0: draw0(); break;
+        case 1: draw1(); break;
+        case 2: draw2(); break;
+        case 3: draw3(); break;
+        case 4: draw4(); break;
+        case 5: draw5(); break;
+        case 6: draw6(); break;
+        case 7: draw7(); break;
+        case 8: draw8(); break;
+        case 9: draw9(); break;
+        default: draw0(); break;
+    }
+    render();
+}
+
+// ---------------- DRAW TWO DIGITS ----------------
+void drawTwoDigits(int number) {
+    clearFrame();
+    
+    int tens = number / 10;
+    int ones = number % 10;
+    
+    // Draw tens digit (centered left)
+    if(tens > 0) {
+        // Shift tens digit to the left side
+        for(int row = 0; row < 8; row++) {
+            for(int col = 0; col < 5; col++) {
+                // We need to map the digit patterns
+                // For simplicity, draw the digit at position 0
+                switch(tens) {
+                    case 1: // Draw 1 at position 0
+                        if((row >= 1 && row <= 6) && col == 2) setPixel(2, row, 7);
+                        break;
+                    case 2:
+                        if(row == 0 && col >= 0 && col <= 3) setPixel(col, row, 7);
+                        if(col == 3 && row >= 0 && row <= 2) setPixel(3, row, 7);
+                        if(row == 2 && col >= 0 && col <= 3) setPixel(col, row, 7);
+                        if(col == 0 && row >= 2 && row <= 6) setPixel(0, row, 7);
+                        if(row == 6 && col >= 0 && col <= 3) setPixel(col, row, 7);
+                        break;
+                    case 3:
+                        if(row == 0 && col >= 0 && col <= 3) setPixel(col, row, 7);
+                        if(col == 3 && row >= 0 && row <= 6) setPixel(3, row, 7);
+                        if(row == 2 && col >= 0 && col <= 3) setPixel(col, row, 7);
+                        if(row == 6 && col >= 0 && col <= 3) setPixel(col, row, 7);
+                        break;
+                    case 4:
+                        if(col == 0 && row >= 0 && row <= 2) setPixel(0, row, 7);
+                        if(col == 3 && row >= 0 && row <= 6) setPixel(3, row, 7);
+                        if(row == 2 && col >= 0 && col <= 3) setPixel(col, row, 7);
+                        break;
+                    case 5:
+                        if(row == 0 && col >= 0 && col <= 3) setPixel(col, row, 7);
+                        if(col == 0 && row >= 0 && row <= 2) setPixel(0, row, 7);
+                        if(row == 2 && col >= 0 && col <= 3) setPixel(col, row, 7);
+                        if(col == 3 && row >= 2 && row <= 6) setPixel(3, row, 7);
+                        if(row == 6 && col >= 0 && col <= 3) setPixel(col, row, 7);
+                        break;
+                    case 6:
+                        if(row == 0 && col >= 0 && col <= 3) setPixel(col, row, 7);
+                        if(col == 0 && row >= 0 && row <= 6) setPixel(0, row, 7);
+                        if(row == 2 && col >= 0 && col <= 3) setPixel(col, row, 7);
+                        if(col == 3 && row >= 2 && row <= 6) setPixel(3, row, 7);
+                        if(row == 6 && col >= 0 && col <= 3) setPixel(col, row, 7);
+                        break;
+                    case 7:
+                        if(row == 0 && col >= 0 && col <= 3) setPixel(col, row, 7);
+                        if(col == 3 && row >= 0 && row <= 6) setPixel(3, row, 7);
+                        break;
+                    case 8:
+                        if(row == 0 && col >= 0 && col <= 3) setPixel(col, row, 7);
+                        if(col == 0 && row >= 0 && row <= 6) setPixel(0, row, 7);
+                        if(col == 3 && row >= 0 && row <= 6) setPixel(3, row, 7);
+                        if(row == 2 && col >= 0 && col <= 3) setPixel(col, row, 7);
+                        if(row == 6 && col >= 0 && col <= 3) setPixel(col, row, 7);
+                        break;
+                    case 9:
+                        if(row == 0 && col >= 0 && col <= 3) setPixel(col, row, 7);
+                        if(col == 0 && row >= 0 && row <= 2) setPixel(0, row, 7);
+                        if(col == 3 && row >= 0 && row <= 6) setPixel(3, row, 7);
+                        if(row == 2 && col >= 0 && col <= 3) setPixel(col, row, 7);
+                        if(row == 6 && col >= 0 && col <= 3) setPixel(col, row, 7);
+                        break;
+                }
+            }
+        }
+    }
+    
+    // Draw ones digit (centered right)
+    for(int row = 0; row < 8; row++) {
+        for(int col = 0; col < 5; col++) {
+            switch(ones) {
+                case 0:
+                    if(row == 0 && col >= 5 && col <= 8) setPixel(col, row, 7);
+                    if((col == 5 || col == 8) && row >= 0 && row <= 6) setPixel(col, row, 7);
+                    if(row == 6 && col >= 5 && col <= 8) setPixel(col, row, 7);
+                    break;
+                case 1:
+                    if((row >= 1 && row <= 6) && col == 8) setPixel(col, row, 7);
+                    break;
+                case 2:
+                    if(row == 0 && col >= 5 && col <= 8) setPixel(col, row, 7);
+                    if(col == 8 && row >= 0 && row <= 2) setPixel(col, row, 7);
+                    if(row == 2 && col >= 5 && col <= 8) setPixel(col, row, 7);
+                    if(col == 5 && row >= 2 && row <= 6) setPixel(col, row, 7);
+                    if(row == 6 && col >= 5 && col <= 8) setPixel(col, row, 7);
+                    break;
+                case 3:
+                    if(row == 0 && col >= 5 && col <= 8) setPixel(col, row, 7);
+                    if(col == 8 && row >= 0 && row <= 6) setPixel(col, row, 7);
+                    if(row == 2 && col >= 5 && col <= 8) setPixel(col, row, 7);
+                    if(row == 6 && col >= 5 && col <= 8) setPixel(col, row, 7);
+                    break;
+                case 4:
+                    if(col == 5 && row >= 0 && row <= 2) setPixel(col, row, 7);
+                    if(col == 8 && row >= 0 && row <= 6) setPixel(col, row, 7);
+                    if(row == 2 && col >= 5 && col <= 8) setPixel(col, row, 7);
+                    break;
+                case 5:
+                    if(row == 0 && col >= 5 && col <= 8) setPixel(col, row, 7);
+                    if(col == 5 && row >= 0 && row <= 2) setPixel(col, row, 7);
+                    if(row == 2 && col >= 5 && col <= 8) setPixel(col, row, 7);
+                    if(col == 8 && row >= 2 && row <= 6) setPixel(col, row, 7);
+                    if(row == 6 && col >= 5 && col <= 8) setPixel(col, row, 7);
+                    break;
+                case 6:
+                    if(row == 0 && col >= 5 && col <= 8) setPixel(col, row, 7);
+                    if(col == 5 && row >= 0 && row <= 6) setPixel(col, row, 7);
+                    if(row == 2 && col >= 5 && col <= 8) setPixel(col, row, 7);
+                    if(col == 8 && row >= 2 && row <= 6) setPixel(col, row, 7);
+                    if(row == 6 && col >= 5 && col <= 8) setPixel(col, row, 7);
+                    break;
+                case 7:
+                    if(row == 0 && col >= 5 && col <= 8) setPixel(col, row, 7);
+                    if(col == 8 && row >= 0 && row <= 6) setPixel(col, row, 7);
+                    break;
+                case 8:
+                    if(row == 0 && col >= 5 && col <= 8) setPixel(col, row, 7);
+                    if(col == 5 && row >= 0 && row <= 6) setPixel(col, row, 7);
+                    if(col == 8 && row >= 0 && row <= 6) setPixel(col, row, 7);
+                    if(row == 2 && col >= 5 && col <= 8) setPixel(col, row, 7);
+                    if(row == 6 && col >= 5 && col <= 8) setPixel(col, row, 7);
+                    break;
+                case 9:
+                    if(row == 0 && col >= 5 && col <= 8) setPixel(col, row, 7);
+                    if(col == 5 && row >= 0 && row <= 2) setPixel(col, row, 7);
+                    if(col == 8 && row >= 0 && row <= 6) setPixel(col, row, 7);
+                    if(row == 2 && col >= 5 && col <= 8) setPixel(col, row, 7);
+                    if(row == 6 && col >= 5 && col <= 8) setPixel(col, row, 7);
+                    break;
+            }
+        }
+    }
+    
+    render();
+}
+
+// ---------------- DRAW COUNT ----------------
+void drawCount(int count) {
+    if(count < 10) {
+        drawNumber(count);
+    } else if(count < 100) {
+        drawTwoDigits(count);
+    } else {
+        drawNumber(9);
+        // Add "99+" indicator
+        setPixel(10, 0, 7);
+        setPixel(11, 0, 7);
+        setPixel(10, 1, 7);
+        setPixel(11, 1, 7);
+        render();
+    }
+}
+
+// ---------------- BRIDGE FUNCTIONS ----------------
+
+String blink_led(String arg) {
+    int times = arg.toInt();
+    if (times <= 0 || times > 20) {
+        return "Invalid count. Use 1-20";
+    }
+    
+    for (int i = 0; i < times; i++) {
+        digitalWrite(LED_PIN, HIGH);
+        delay(150);
+        digitalWrite(LED_PIN, LOW);
+        delay(150);
+    }
+    return String("Blinked ") + String(times) + " times";
+}
+
+String show_detection(String arg) {
+    // Increment count
+    person_count++;
+    detection_time = millis();
+    
+    // Show person icon
+    drawPerson();
+    delay(400);
+    
+    // Show the count number
+    drawCount(person_count);
+    
+    // Blink LED
+    for(int i = 0; i < 2; i++) {
+        digitalWrite(LED_PIN, HIGH);
+        delay(100);
+        digitalWrite(LED_PIN, LOW);
+        delay(100);
+    }
+    
+    // Notify Python
+    Bridge.notify("count_updated", person_count);
+    
+    return String("Count: ") + String(person_count);
+}
+
+String update_count(String arg) {
+    int new_count = arg.toInt();
+    if(new_count >= 0) {
+        person_count = new_count;
+        drawCount(person_count);
+        Bridge.notify("count_updated", person_count);
+        return String("Count updated to: ") + String(person_count);
+    }
+    return "Invalid count";
+}
+
+String reset_count(String arg) {
+    person_count = 0;
+    clearFrame();
+    render();
+    Bridge.notify("count_reset", 0);
+    return "Count reset to 0";
+}
+
+String get_count(String arg) {
+    return String(person_count);
+}
+
+String show_count(String arg) {
+    drawCount(person_count);
+    return String("Showing count: ") + String(person_count);
+}
+
+String clear_display(String arg) {
+    clearFrame();
+    render();
+    return "Display cleared";
+}
+
+// ---------------- SETUP ----------------
+void setup() {
+    Serial.begin(9600);
+    
+    // Setup LED
+    pinMode(LED_PIN, OUTPUT);
+    digitalWrite(LED_PIN, LOW);
+    
+    // Initialize LED Matrix
+    matrix.begin();
+    matrix.setGrayscaleBits(3);
+    clearFrame();
+    render();
+    
+    // Show startup
+    drawNumber(0);
+    delay(500);
+    clearFrame();
+    render();
+    delay(300);
+    drawPerson();
+    delay(500);
+    clearFrame();
+    render();
+    
+    // Initialize Bridge
+    Bridge.begin();
+    
+    // Register functions
+    Bridge.provide_safe("blink_led", blink_led);
+    Bridge.provide_safe("show_detection", show_detection);
+    Bridge.provide_safe("update_count", update_count);
+    Bridge.provide_safe("reset_count", reset_count);
+    Bridge.provide_safe("get_count", get_count);
+    Bridge.provide_safe("show_count", show_count);
+    Bridge.provide_safe("clear_display", clear_display);
+    
+    Bridge.notify("mcu_ready", "MCU ready!");
+    
+    Serial.println("Person Counter ready!");
+    Serial.println("Count: 0");
+}
+
+// ---------------- LOOP ----------------
+void loop() {
+    unsigned long now = millis();
+    
+    // After showing count for 3 seconds, clear and show count again
+    if(now - detection_time > DETECTION_DISPLAY_DURATION && detection_time > 0) {
+        detection_time = 0;
+        clearFrame();
+        render();
+        delay(100);
+        drawCount(person_count);
+    }
+    
+    delay(10);
+}
