@@ -1,35 +1,38 @@
 # Arduino-UNO-Q-INDUS
-Person Detection with LED Matrix Display
-A complete person detection application for Arduino Uno Q that displays real-time person count on both the LED matrix and web UI.
+👤 Person Detection with LED Matrix Display
+Complete person detection application for Arduino Uno Q that displays real-time person count on both the LED matrix and web UI.
 
 📋 Overview
-This application uses the Arduino Uno Q's dual-processor architecture to:
+This application leverages the Arduino Uno Q's dual-processor architecture to deliver a seamless person detection experience:
 
-Python (MPU): Run video object detection using the VideoObjectDetection brick
+🐍 Python (MPU): Runs video object detection using the VideoObjectDetection brick
 
-C++ (MCU): Control the LED matrix and built-in LED in real-time
+⚙️ C++ (MCU): Controls the LED matrix and built-in LED in real-time
 
-Web UI: Display person count and detection results
+🌐 Web UI: Displays person count and detection results
+
+The system processes camera input, detects people, and provides instant visual feedback through multiple interfaces.
 
 ✨ Features
+Core Functionality
 ✅ Real-time person detection using computer vision
 
-✅ LED matrix display showing:
+✅ Dual-processor communication via Bridge protocol
 
-👤 Person icon when detected
+✅ Live video processing with configurable confidence thresholds
 
-🔢 Person count (0-99)
+LED Matrix Display
+👤 Person icon displayed when detection occurs
 
-✅ Web UI with:
+🔢 Person count (0-99) shown prominently
 
-Big person count display
+💡 Built-in LED blinks on each detection
 
-Recent detections list
+Web Interface
+📊 Big person count display for easy visibility
 
-Confidence threshold slider
+📋 Recent detections list with timestamps
 
-Reset button
+🎚️ Confidence threshold slider for sensitivity adjustment
 
-✅ Built-in LED blinks on detection
-
-✅ Bidirectional communication between Python and C++ via Bridge
+🔄 Reset button for clearing detection history
