@@ -1,0 +1,67 @@
+# SPDX-FileCopyrightText: Copyright (C) ARDUINO SRL
+#
+# SPDX-License-Identifier: MPL-2.0
+
+from arduino.app_utils import App, Bridge
+from arduino.app_bricks.web_ui import WebUI
+from arduino.app_bricks.video_objectdetection import VideoObjectDetection
+from datetime import datetime, UTC
+
+ui = WebUI()
+
+detection_stream = VideoObjectDetection(
+    confidence=0.5,
+    debounce_sec=0.0
+)
+
+ui.on_message(
+    "override_th",
+    lambda sid, threshold:
+    detection_stream.override_threshold(threshold)
+)
+
+# Global counter to track person count
+current_person_count = 0
+
+def send_detections_to_ui(detections: dict):
+    global current_person_count
+    
+    # Count detected persons
+    person_count = len(detections.get("person", []))
+    
+    # Only update if count changed
+    if person_count > 0 and person_count != current_person_count:
+        current_person_count = person_count
+        
+        # Show detection on matrix (increments count on MCU)
+        Bridge.call("show_detection", "")
+        
+        # Blink LED
+        Bridge.call("blink_led", "3")
+        
+        # Update the MCU count to match Python count
+        Bridge.call("update_count", str(person_count))
+        
+        print(f"Person detected! Count: {person_count}")
+    
+    # Send count to HTML page
+    ui.send_message(
+        "people_count",
+        {
+            "count": person_count
+        }
+    )
+
+    # Send individual detections
+    for key, values in detections.items():
+        for value in values:
+            entry = {
+                "content": key,
+                "confidence": value.get("confidence"),
+                "timestamp": datetime.now(UTC).isoformat()
+            }
+            ui.send_message("detection", message=entry)
+
+detection_stream.on_detect_all(send_detections_to_ui)
+
+App.run()
